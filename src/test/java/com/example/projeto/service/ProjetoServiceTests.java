@@ -1,9 +1,13 @@
-package com.example.projeto.projeto;
+package com.example.projeto.service;
 
 import com.example.projeto.usuario.UsuarioDTO;
 import com.example.projeto.usuario.UsuarioService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import com.example.projeto.projeto.ProjetoService;
+import com.example.projeto.projeto.ProjetoModel;
+import com.example.projeto.projeto.ProjetoController;
+import com.example.projeto.projeto.ProjetoRepository;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
