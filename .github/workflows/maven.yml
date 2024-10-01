@@ -1,0 +1,89 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pull-requests: write
+      packages: write
+      
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
+        
+    - name: Build with Maven
+      run: mvn -B package --file pom.xml
+    
+    - name: Run tests with Maven
+      run: mvn test
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: "caiolib"
+        password: ${{ secrets.DOCKERHUB_TOKEN }}  
+        
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: caiolib/projeto:${{ github.sha }}
+
+    - name: Execute remote SSH commands to deploy
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.HOST_TEST }}
+        username: "ubuntu"
+        key: ${{ secrets.KEY_TEST }}
+        port: 22
+        script: |
+          # Verificar se o Docker está instalado
+          if ! command -v docker &> /dev/null
+          then
+              echo "Docker não está instalado. Instalando Docker..."
+              sudo apt update
+              sudo apt install -y docker.io
+              sudo systemctl start docker
+              sudo systemctl enable docker
+          else
+              echo "Docker já está instalado"
+          fi
+      
+          # Adicionar o usuário ao grupo docker para evitar erros de permissão
+          sudo usermod -aG docker $USER
+
+          # Reiniciar a sessão para aplicar as mudanças de permissão
+          newgrp docker
+
+          # Verificar se a rede "rede" existe, se não, criá-la
+          if ! docker network ls | grep -w rede; then
+              echo "Rede 'rede' não encontrada. Criando a rede..."
+              docker network create rede
+          else
+              echo "Rede 'rede' já existe."
+          fi
+
+          # Parar e remover o container antigo, se existir
+          docker stop projeto || true  # Nome alterado de 'jogador' para 'projeto'
+          docker rm --force projeto || true  # Nome alterado de 'jogador' para 'projeto'
+          
+          # Executar o novo container
+          docker run -d -p 8081:8081 --network=rede --name projeto caiolib/projeto:${{ github.sha }}  # Nome alterado para 'projeto'
